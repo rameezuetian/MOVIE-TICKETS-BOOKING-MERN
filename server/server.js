@@ -7,12 +7,11 @@ import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
 
 const app = express();
-const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cors());
 
-// Inngest endpoint MUST be publicly accessible
+// Inngest
 app.use(
   "/api/inngest",
   serve({
@@ -21,7 +20,7 @@ app.use(
   })
 );
 
-// Clerk middleware for the rest of your application
+// Clerk
 app.use(clerkMiddleware());
 
 connectDB();
@@ -30,6 +29,4 @@ app.get("/", (req, res) => {
   res.send("Server is Live!");
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on localhost: ${port}`);
-});
+export default app;
