@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Inngest
+// Inngest endpoint
 app.use(
   "/api/inngest",
   serve({
