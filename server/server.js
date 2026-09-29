@@ -9,29 +9,27 @@ import { inngest, functions } from "./inngest/index.js";
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(cors());
-app.use(clerkMiddleware());
 
-// MongoDB
-connectDB();
-
-// Routes
-app.get("/", (req, res) => {
-    res.send("Server is Live!");
-});
-
-// Inngest
+// Inngest endpoint MUST be publicly accessible
 app.use(
-    "/api/inngest",
-    serve({
-        client: inngest,
-        functions,
-    })
+  "/api/inngest",
+  serve({
+    client: inngest,
+    functions,
+  })
 );
 
-// Start server
+// Clerk middleware for the rest of your application
+app.use(clerkMiddleware());
+
+connectDB();
+
+app.get("/", (req, res) => {
+  res.send("Server is Live!");
+});
+
 app.listen(port, () => {
-    console.log(`Server is running on localhost: ${port}`);
+  console.log(`Server is running on localhost: ${port}`);
 });
