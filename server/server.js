@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import { clerkMiddleware } from "@clerk/express";
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
+import showRouter from "./routes/showRoutes.js";
 
 const app = express();
 
@@ -28,5 +29,6 @@ connectDB();
 app.get("/", (req, res) => {
   res.send("Server is Live!");
 });
+app.use('api/show/' ,showRouter)
 
 export default app;
