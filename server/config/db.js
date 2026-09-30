@@ -1,17 +1,26 @@
 import mongoose from "mongoose";
-import dns from 'dns'
 
-dns.setServers(["1.1.1.1" , "8.8.8.8"])
+
+let connectionPromise;
+
 const connectDB = async () => {
-  try {
-    if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI is not configured");
-    await mongoose.connect(process.env.MONGODB_URI);
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error("MONGODB_URI is not configured");
 
-    console.log("MongoDB connected successfully");
-  } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    process.exit(1);
+  if (mongoose.connection.readyState === 1) return mongoose.connection;
+  if (!connectionPromise) {
+    connectionPromise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
+    }).then(({ connection }) => {
+      console.log("MongoDB connected successfully");
+      return connection;
+    }).catch((error) => {
+      connectionPromise = undefined;
+      throw error;
+    });
   }
+  return connectionPromise;
 };
 
 export default connectDB;

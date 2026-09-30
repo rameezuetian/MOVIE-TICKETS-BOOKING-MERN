@@ -13,6 +13,19 @@ import userRouter from "./routes/userRoutes.js";
 import { seedDemoData } from "./services/seedDemoData.js";
 
 const app = express();
+let databaseReady;
+
+const ensureDatabase = () => {
+  if (!databaseReady) {
+    databaseReady = connectDB()
+      .then(seedDemoData)
+      .catch((error) => {
+        databaseReady = undefined;
+        throw error;
+      });
+  }
+  return databaseReady;
+};
 
 app.use(cors({ origin: process.env.CLIENT_URL?.split(",") || true }));
 app.post("/api/booking/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
@@ -30,17 +43,21 @@ app.use(
 // Clerk
 app.use(clerkMiddleware());
 
-const databaseReady = connectDB().then(seedDemoData);
-app.use(async (_req, _res, next) => {
-  try { await databaseReady; next(); }
-  catch (error) { next(error); }
+app.get("/", (_req, res) => {
+  res.send("Server is Live!");
+});
+
+app.use(async (_req, res, next) => {
+  try {
+    await ensureDatabase();
+    next();
+  } catch (error) {
+    console.error("MongoDB connection failed:", error.message);
+    res.status(503).json({ success: false, message: "Database unavailable. Check the MongoDB Atlas network access list and MONGODB_URI." });
+  }
 });
 
 const port = process.env.PORT || 5000;
-
-app.get("/", (req, res) => {
-  res.send("Server is Live!");
-});
 app.use('/api/show/' ,showRouter)
 app.use('/api/booking' , bookingRouter)
 app.use('/api/admin' , adminRouter)
@@ -49,5 +66,5 @@ app.use('/api/user' , userRouter)
 export default app;
 
 if (process.env.NODE_ENV !== "production") {
-  databaseReady.then(() => app.listen(port, () => console.log(`Server listening on ${port}`)));
+  app.listen(port, () => console.log(`Server listening on ${port}`));
 }
