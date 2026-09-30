@@ -9,8 +9,17 @@ const tmdb = axios.create({
 
 export const getNowPlayingMovies = async (_req, res) => {
   try {
+    if (!process.env.TMDB_API_KEY) {
+      return res.status(503).json({ success: false, message: "TMDB_API_KEY is not configured on the server" });
+    }
     const { data } = await tmdb.get("/movie/now_playing");
-    res.json({ success: true, movies: data.results });
+    const movies = data.results.map((movie) => ({
+      ...movie,
+      _id: String(movie.id),
+      poster_path: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "",
+      backdrop_path: movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : "",
+    }));
+    res.json({ success: true, movies });
   } catch (error) {
     res.status(502).json({ success: false, message: error.message });
   }

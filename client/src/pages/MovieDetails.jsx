@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { dummyShowsData } from "../assets/assets";
 import { apiRequest } from "../lib/api";
 import BlurCircle from "../components/BlurCircle";
 import { Heart, PlayCircleIcon, StarIcon } from "lucide-react";
@@ -13,11 +12,13 @@ export default function MovieDetails() {
   const { id } = useParams();
 
   const [show, setShow] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     setShow(null);
     apiRequest(`/show/${id}`).then(setShow).catch((error) => { console.error(error); setShow({ error: true }); });
+    apiRequest("/show/all").then(({ shows }) => setRecommendations(shows.filter((movie) => movie._id !== id).slice(0, 4))).catch(console.error);
   }, [id]);
 
   return show && !show.error ? (
@@ -113,8 +114,8 @@ export default function MovieDetails() {
       </p>
 
       <div className="flex flex-wrap max-sm:justify-center gap-8">
-        {dummyShowsData.slice(0, 4).map((movie, index) => (
-          <MovieCard key={index} movie={movie} />
+        {recommendations.map((movie) => (
+          <MovieCard key={movie._id} movie={movie} />
         ))}
       </div>
 

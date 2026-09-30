@@ -5,15 +5,18 @@ import connectDB from "./config/db.js";
 import { clerkMiddleware } from "@clerk/express";
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js";
+import { handleStripeWebhook } from "./controllers/bookingController.js";
 import showRouter from "./routes/showRoutes.js";
 import bookingRouter from "./routes/bookingRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import userRouter from "./routes/userRoutes.js";
+import { seedDemoData } from "./services/seedDemoData.js";
 
 const app = express();
 
-app.use(express.json());
 app.use(cors({ origin: process.env.CLIENT_URL?.split(",") || true }));
+app.post("/api/booking/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+app.use(express.json());
 
 // Inngest endpoint
 app.use(
@@ -27,6 +30,12 @@ app.use(
 // Clerk
 app.use(clerkMiddleware());
 
+const databaseReady = connectDB().then(seedDemoData);
+app.use(async (_req, _res, next) => {
+  try { await databaseReady; next(); }
+  catch (error) { next(error); }
+});
+
 const port = process.env.PORT || 5000;
 
 app.get("/", (req, res) => {
@@ -39,7 +48,6 @@ app.use('/api/user' , userRouter)
 
 export default app;
 
-const databaseReady = connectDB();
 if (process.env.NODE_ENV !== "production") {
   databaseReady.then(() => app.listen(port, () => console.log(`Server listening on ${port}`)));
 }

@@ -18,11 +18,28 @@ export default function MyBookings() {
     try {
       if (!isSignedIn) { setBookings([]); return; }
       const token = await getToken();
+      const sessionId = new URLSearchParams(window.location.search).get("session_id");
+      if (sessionId) {
+        window.history.replaceState({}, "", window.location.pathname);
+        try {
+          await apiRequest("/booking/confirm", { method: "POST", token, body: JSON.stringify({ sessionId }) });
+          toast.success("Payment confirmed");
+        } catch (error) { toast.error(error.message); }
+      }
       const result = await apiRequest("/user/bookings", { token });
       setBookings(result.bookings || []);
     } catch (error) { toast.error(error.message); }
     finally { setIsLoading(false); }
   }, [getToken, isSignedIn]);
+
+  const payForBooking = async (bookingId) => {
+    try {
+      const token = await getToken();
+      const result = await apiRequest(`/booking/checkout/${bookingId}`, { method: "POST", token });
+      if (!result.url) throw new Error("Stripe did not return a checkout URL");
+      window.location.assign(result.url);
+    } catch (error) { toast.error(error.message); }
+  };
 
   useEffect(() => {
     getMyBookings();
@@ -44,9 +61,9 @@ export default function MyBookings() {
         My Bookings
       </h1>
 
-      {bookings.map((item, index) => (
+      {bookings.map((item) => (
         <div
-          key={index}
+          key={item._id}
           className="flex flex-col md:flex-row justify-between bg-primary/8 border border-primary/20 rounded-lg mt-4 p-2 max-w-3xl"
         >
           {/* Movie Information */}
@@ -81,7 +98,7 @@ export default function MyBookings() {
               </p>
 
               {!item.isPaid && (
-                <button className="bg-primary px-4 py-1.5 mb-3 text-sm rounded-full font-medium cursor-pointer">
+                <button onClick={() => payForBooking(item._id)} className="bg-primary px-4 py-1.5 mb-3 text-sm rounded-full font-medium cursor-pointer">
                   Pay Now
                 </button>
               )}

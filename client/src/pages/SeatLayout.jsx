@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { assets } from "../assets/assets";
 import Loading from "../components/Loading";
 import { ArrowRightIcon, ClockIcon } from "lucide-react";
@@ -12,7 +12,6 @@ import { useAuth } from "@clerk/react";
 
 export default function SeatLayout() {
   const { getToken } = useAuth();
-  const navigate = useNavigate();
   const groupRows = [
     ["A", "B"],
     ["C", "D"],
@@ -170,8 +169,9 @@ export default function SeatLayout() {
           if (!selectedTime || !selectedSeats.length) return toast("Select a showtime and seats first");
           try {
             const token = await getToken();
-            await apiRequest("/booking/create", { method: "POST", token, body: JSON.stringify({ showId: selectedTime.showId, selectedSeats }) });
-            toast.success("Booking created"); navigate("/my-bookings");
+            const result = await apiRequest("/booking/create", { method: "POST", token, body: JSON.stringify({ showId: selectedTime.showId, selectedSeats }) });
+            if (!result.url) throw new Error("Stripe did not return a checkout URL");
+            window.location.assign(result.url);
           } catch (error) { toast.error(error.message); }
         }} className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-full font-medium cursor-pointer active:scale-95">
           Proceed to CheckOut
