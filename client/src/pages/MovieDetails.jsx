@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { dummyDateTimeData, dummyShowsData } from "../assets/assets";
+import { dummyShowsData } from "../assets/assets";
+import { apiRequest } from "../lib/api";
 import BlurCircle from "../components/BlurCircle";
 import { Heart, PlayCircleIcon, StarIcon } from "lucide-react";
 import timeFormat from "../lib/timeFormat";
@@ -14,22 +15,12 @@ export default function MovieDetails() {
   const [show, setShow] = useState(null);
   const navigate = useNavigate();
 
-  const getShow = async (id) => {
-    const show = dummyShowsData.find((show) => show._id === id);
-    if(show){
-      setShow({
-      movie: show,
-      dateTime: dummyDateTimeData,
-    });
-    }
-    
-  };
-
   useEffect(() => {
-    getShow(id);
+    setShow(null);
+    apiRequest(`/show/${id}`).then(setShow).catch((error) => { console.error(error); setShow({ error: true }); });
   }, [id]);
 
-  return show ? (
+  return show && !show.error ? (
     <div className="px-6 md:px-16 lg:px-40 pt-30 md:pt-50">
 
       {/* Movie Details */}

@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { assets, dummyDateTimeData, dummyShowsData } from "../assets/assets";
+import { assets } from "../assets/assets";
 import Loading from "../components/Loading";
 import { ArrowRightIcon, ClockIcon } from "lucide-react";
 import isoTimeFormat from "../lib/isoTimeFormat.js";
 import BlurCircle from "../components/BlurCircle.jsx";
 import { toast } from "react-hot-toast";
+import { apiRequest } from "../lib/api.js";
+import { useAuth } from "@clerk/react";
 
 
 export default function SeatLayout() {
+  const { getToken } = useAuth();
   const navigate = useNavigate();
   const groupRows = [
     ["A", "B"],
@@ -22,17 +25,12 @@ export default function SeatLayout() {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [selectedTime, setSelectedTime] = useState(null);
   const [show, setShow] = useState(null);
+  const [occupiedSeats, setOccupiedSeats] = useState([]);
 
-  const getShow = () => {
-    const movie = dummyShowsData.find((show) => show._id === id);
-
-    if (movie) {
-      setShow({
-        movie,
-        dateTime: dummyDateTimeData,
-      });
-    }
-  };
+  const getShow = useCallback(async () => {
+    try { setShow(await apiRequest(`/show/${id}`)); }
+    catch (error) { console.error(error); setShow({ error: true }); }
+  }, [id]);
 
   const handleSeatClick = (seatId) => {
     // User must select a time first
@@ -66,8 +64,9 @@ export default function SeatLayout() {
           return (
             <button
               key={seatId}
+              disabled={occupiedSeats.includes(seatId)}
               onClick={() => handleSeatClick(seatId)}
-              className={`h-8 w-8 rounded border border-primary/60 cursor-pointer ${
+              className={`h-8 w-8 rounded border border-primary/60 cursor-pointer ${occupiedSeats.includes(seatId) ? "opacity-40 cursor-not-allowed" : ""} ${
                 selectedSeats.includes(seatId)
                   ? "bg-primary text-white"
                   : ""
@@ -83,11 +82,12 @@ export default function SeatLayout() {
 
   useEffect(() => {
     getShow();
-  }, [id]);
+  }, [getShow]);
 
   if (!show) {
     return <Loading />;
   }
+  if (show.error) return <p className="pt-40 text-center">Unable to load this show.</p>;
 
   const availableTimes = show.dateTime[date] || [];
 
@@ -105,7 +105,11 @@ export default function SeatLayout() {
             availableTimes.map((item) => (
               <div
                 key={item.time}
-                onClick={() => setSelectedTime(item)}
+                onClick={async () => {
+                  setSelectedTime(item);
+                  try { const result = await apiRequest(`/booking/seats/${item.showId}`); setOccupiedSeats(result.occupiedSeats || []); }
+                  catch (error) { toast.error(error.message); }
+                }}
                 className={`flex items-center gap-2 px-6 py-2 w-max rounded-r-md cursor-pointer transition ${
                   selectedTime?.time === item.time
                     ? "bg-primary text-white"
@@ -162,7 +166,14 @@ export default function SeatLayout() {
           </div>
 
         </div>
-        <button onClick={()=> navigate('/my-bookings')} className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-full font-medium cursor-pointer active:scale-95">
+        <button onClick={async ()=> {
+          if (!selectedTime || !selectedSeats.length) return toast("Select a showtime and seats first");
+          try {
+            const token = await getToken();
+            await apiRequest("/booking/create", { method: "POST", token, body: JSON.stringify({ showId: selectedTime.showId, selectedSeats }) });
+            toast.success("Booking created"); navigate("/my-bookings");
+          } catch (error) { toast.error(error.message); }
+        }} className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-full font-medium cursor-pointer active:scale-95">
           Proceed to CheckOut
             <ArrowRightIcon strokeWidth={3} className="w-4 h-4" />
         </button>

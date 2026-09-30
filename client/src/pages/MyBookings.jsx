@@ -1,24 +1,32 @@
-import { useEffect, useState } from "react";
-import { dummyBookingData } from "../assets/assets";
+import { useCallback, useEffect, useState } from "react";
 import Loading from "../components/Loading";
 import BlurCircle from "../components/BlurCircle";
 // import isoTimeFormat from "../lib/isoTimeFormat";
 import dateFormat from "../lib/dateFormat";
+import { apiRequest } from "../lib/api.js";
+import { useAuth } from "@clerk/react";
+import { toast } from "react-hot-toast";
 
 export default function MyBookings() {
   const currency = import.meta.env.VITE_CURRENCY;
 
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { getToken, isSignedIn } = useAuth();
 
-  const getMyBookings = async () => {
-    setBookings(dummyBookingData);
-    setIsLoading(false);
-  };
+  const getMyBookings = useCallback(async () => {
+    try {
+      if (!isSignedIn) { setBookings([]); return; }
+      const token = await getToken();
+      const result = await apiRequest("/user/bookings", { token });
+      setBookings(result.bookings || []);
+    } catch (error) { toast.error(error.message); }
+    finally { setIsLoading(false); }
+  }, [getToken, isSignedIn]);
 
   useEffect(() => {
     getMyBookings();
-  }, []);
+  }, [getMyBookings]);
 
   if (isLoading) {
     return <Loading />;

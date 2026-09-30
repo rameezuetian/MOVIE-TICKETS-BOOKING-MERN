@@ -1,136 +1,78 @@
-import Show from "../models/Show";
+import axios from "axios";
+import Movie from "../models/Movie.js";
+import Show from "../models/Show.js";
 
-export const getNowPlayingMovies = async (req, res)=>{
-    try{
+const tmdb = axios.create({
+  baseURL: "https://api.themoviedb.org/3",
+  headers: { accept: "application/json", Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+});
 
-        await axios.get('https://api.themoviedb.org/3/movie/now_playing',{
-             headers: {accept: 'application/json', Authorization: `Bearer ${process.env.TMDB_API_KEY}`}
-        })
+export const getNowPlayingMovies = async (_req, res) => {
+  try {
+    const { data } = await tmdb.get("/movie/now_playing");
+    res.json({ success: true, movies: data.results });
+  } catch (error) {
+    res.status(502).json({ success: false, message: error.message });
+  }
+};
 
-        const movie = data.results;
-        res.json({success:true , movies:movies})
-    }catch(error){
-
-        console.log(error);
-        res.json({success:false , message:error.message})
-
+export const addShow = async (req, res) => {
+  try {
+    const { movieId, showsInput, showPrice } = req.body;
+    let movie = await Movie.findById(movieId);
+    if (!movie) {
+      const [{ data: details }, { data: credits }] = await Promise.all([
+        tmdb.get(`/movie/${movieId}`), tmdb.get(`/movie/${movieId}/credits`),
+      ]);
+      movie = await Movie.create({
+        _id: String(movieId), title: details.title, overview: details.overview || "",
+        poster_path: details.poster_path || "", backdrop_path: details.backdrop_path || "",
+        release_date: details.release_date || "", original_language: details.original_language || "",
+        tagline: details.tagline || "", genres: details.genres || [], casts: credits.cast || [],
+        vote_average: details.vote_average || 0, runtime: details.runtime || 0,
+      });
     }
-}
 
-
-// api to add a nwe shoe to the database
-
-export const addShow = async (req , res) =>{
-    try {
-        const {movieId , showsInput , showPrice} = req.body;
-
-        let movie = await Movie.findById(movieId)
-
-        if(!movie){
-            const [movieDetailsResponse , movieCreditsResponse] = await Promise.all(
-                [
-                    axios.get(`https://api.themoviedb.org/3/movie/{movieId}`,{
-                         headers: {accept: 'application/json', Authorization: `Bearer ${process.env.TMDB_API_KEY}`}
-
-                    }),
-                    axios.get(`https://api.themoviedb.org/3/movie/{movieId}/credits`,{
-                                     headers: {accept: 'application/json', Authorization: `Bearer ${process.env.TMDB_API_KEY}`}
-                    })
-
-                ]
-            )
-            const movieApiData = movieCreditsResponse.data;
-            const movieCreditsData =  movieCreditsResponse.data;
-
-            const movieDetails = {
-                _id :movieId,
-                title:movieApiData.title,
-                overview: movieApiData.overview,
-                poster_path: movieApiData.poster_path,
-                backdrop_path:movieApiData.backdrop_path,
-                genres:movieApiData.genres,
-                casts:movieApiData.cast,
-                release_date:movieApiData.release_date,
-                original_language:movieApiData.original_language,
-                tagline:movieApiData.tagline || " " ,
-                vote_average: movieApiData.vote_average,
-                runtime:movieApiData.runtime
-            }
-
-            movie =  await Movie.create(movieDetails)
-        }
-
-        const showsToCreate = [];
-
-        showsInput.forEach(show=>{
-            const showDate = show.date;
-            show.time.forEach(()=>{
-                const dateTimeString = `${showDate}T${time}`;
-                showsToCreate.push({
-                    movie:movieId,
-                    showDateTime:new Date(dateTimeString),
-                    showPrice , 
-                    occupiedSeats:{}
-                })
-            })
-        });
-
-        if(showsToCreate.length > 0){
-            await Show.insertMany(showsToCreate);
-        }
-
-        res.json({success:true , message:'Show Added successfully.'})
-
-    } catch (error) {
-        console.log(error);
-        res.json({success:false , message:error.message})
+    const shows = (showsInput || []).flatMap(({ date, time }) =>
+      (time || []).map((value) => ({
+        movie: String(movieId), showDateTime: new Date(`${date}T${value}`), showPrice,
+      }))
+    );
+    if (!shows.length || shows.some((show) => Number.isNaN(show.showDateTime.getTime()))) {
+      return res.status(400).json({ success: false, message: "Provide valid show dates and times" });
     }
-} 
+    await Show.insertMany(shows);
+    res.json({ success: true, message: "Show added successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
+export const getShows = async (_req, res) => {
+  try {
+    const shows = await Show.find({ showDateTime: { $gte: new Date() } }).populate("movie").sort({ showDateTime: 1 });
+    const movies = [...new Map(shows.filter((show) => show.movie).map((show) => [show.movie._id, show.movie])).values()];
+    res.json({ success: true, shows: movies });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-// api to  get all shows from the database
-export const getShows = async (req, res) =>{
-    try {
-        const shows = await Show.find({showDateTime: {$gte: new Date()}}).populate('movie').sort({showDateTime:1})
-
-        const uniqueShows = new Set(shows.map(show => show.movie))
-
-        res.json({success:true , shows:Array.from(uniqueShows)})
-    } catch (error) {
-
-        console.log(error);
-        res.json({success:false , message:error.message})
-        
-    }
-}
-
-
-//  api to get a single show from the database
-
-export const getShow = async(req , res)=>{
-    try {
-        const {movieId}  = req.params;
-
-
-        const shows = await Show.find({movie:movieId   , showDateTime: {$gte: new Date()}})
-
-        const movie = await Movie.findById(movieId);
-
-        const dateTime = {};
-
-        show.forEach((show)=>{
-            const date = show.showDateTime.toISOString().split("T")[0];
-            if(!dateTime[date]){
-                dateTime[date] = []
-            }
-            dateTime[date].push({time:show.showDateTime, showId: show._id})
-        })
-
-        res.json({success:true , movie, dateTime})
-    } catch (error) {
-          console.log(error);
-        res.json({success:false , message:error.message})
-
-        
-    }
-}
+export const getShow = async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const [shows, movie] = await Promise.all([
+      Show.find({ movie: movieId, showDateTime: { $gte: new Date() } }).sort({ showDateTime: 1 }),
+      Movie.findById(movieId),
+    ]);
+    if (!movie) return res.status(404).json({ success: false, message: "Movie not found" });
+    const dateTime = {};
+    shows.forEach((show) => {
+      const date = show.showDateTime.toISOString().split("T")[0];
+      (dateTime[date] ||= []).push({ time: show.showDateTime, showId: show._id });
+    });
+    res.json({ success: true, movie, dateTime });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

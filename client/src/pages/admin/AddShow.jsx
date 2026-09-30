@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { dummyShowsData } from "../../assets/assets";
+import { useCallback, useEffect, useState } from "react";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
 import BlurCircle from "../../components/BlurCircle";
 import { CalendarIcon, ClockIcon, PlusIcon, XIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { apiRequest } from "../../lib/api.js";
+import { useAuth } from "@clerk/react";
 
 const AddShow = () => {
   const currency = import.meta.env.VITE_CURRENCY;
@@ -14,14 +15,16 @@ const AddShow = () => {
   const [dateTimeSelection, setDateTimeSelection] = useState({});
   const [dateTimeInput, setDateTimeInput] = useState("");
   const [showPrice, setShowPrice] = useState("");
+  const { getToken } = useAuth();
 
-  const fetchNowPlayingMovies = async () => {
-    setNowPlayingMovies(dummyShowsData);
-  };
+  const fetchNowPlayingMovies = useCallback(async () => {
+    try { const data = await apiRequest("/show/now-playing"); setNowPlayingMovies(data.movies || []); }
+    catch (error) { toast.error(error.message); }
+  }, []);
 
   useEffect(() => {
     fetchNowPlayingMovies();
-  }, []);
+  }, [fetchNowPlayingMovies]);
 
   // Add selected date/time
   const handleDateTimeAdd = () => {
@@ -65,7 +68,7 @@ const AddShow = () => {
   };
 
   // Submit show
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!selectedMovie) {
@@ -81,14 +84,15 @@ const AddShow = () => {
     }
 
     const showData = {
-      movie: selectedMovie,
+      movieId: selectedMovie.id || selectedMovie._id,
       showPrice: Number(showPrice),
-      dateTime: dateTimeSelection,
+      showsInput: Object.entries(dateTimeSelection).map(([date, time]) => ({ date, time })),
     };
-
-    console.log("Show Data:", showData);
-
-    toast.success("Show added successfully!");
+    try {
+      const token = await getToken();
+      const result = await apiRequest("/show/add", { method: "POST", token, body: JSON.stringify(showData) });
+      toast.success(result.message || "Show added successfully");
+    } catch (error) { toast.error(error.message); return; }
 
     // Reset form
     setSelectedMovie(null);

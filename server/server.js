@@ -13,7 +13,7 @@ import userRouter from "./routes/userRoutes.js";
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_URL?.split(",") || true }));
 
 // Inngest endpoint
 app.use(
@@ -27,7 +27,7 @@ app.use(
 // Clerk
 app.use(clerkMiddleware());
 
-connectDB();
+const port = process.env.PORT || 5000;
 
 app.get("/", (req, res) => {
   res.send("Server is Live!");
@@ -38,3 +38,8 @@ app.use('/api/admin' , adminRouter)
 app.use('/api/user' , userRouter)
 
 export default app;
+
+const databaseReady = connectDB();
+if (process.env.NODE_ENV !== "production") {
+  databaseReady.then(() => app.listen(port, () => console.log(`Server listening on ${port}`)));
+}
