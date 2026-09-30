@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
+import dns from 'dns'
 
 
 let connectionPromise;
 
 const connectDB = async () => {
+  // dns.setServers(["1.1.1.1" , "8.8.8.8"])
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error("MONGODB_URI is not configured");
 

@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const configuredBase = import.meta.env.VITE_BASE_URL || import.meta.env.VITE_API_URL || "/api";
+const normalizedBase = configuredBase.replace(/\/$/, "");
+const API_BASE = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
 
 export async function apiRequest(path, options = {}) {
   const { token, ...requestOptions } = options;
